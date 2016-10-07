@@ -6,14 +6,22 @@
     var ExampleOSGJS = window.ExampleOSGJS;
 
     var leftSound = 'https://soundcloud.com/youngma/young-ma-ooouuu-1';
-    var rightSound = '';
+    var rightSound = 'https://soundcloud.com/kodak-black/kodak-black-22-no-flocking';
 
-    var SoundCloudAudioSource = function ( player ) {
+    var getOrCreateAudioContext = function () {
+        var audioCtx = getOrCreateAudioContext.audioCtx;
+        if ( !audioCtx ) {
+            audioCtx = new( window.AudioContext || window.webkitAudioContext );
+            getOrCreateAudioContext.audioCtx = audioCtx;
+        }
+        return audioCtx;
+    };
+
+    var SoundCloudAudioSource = function ( player, positionX, positionY, positionZ ) {
 
         player.crossOrigin = 'anonymous';
-        var self = this;
 
-        var audioCtx = new( window.AudioContext || window.webkitAudioContext ); // this is because it's not been standardised accross browsers yet.
+        var audioCtx = getOrCreateAudioContext();
 
         var panner = audioCtx.createPanner();
         panner.panningModel = 'HRTF';
@@ -27,16 +35,14 @@
         panner.orientationX.value = 1;
         panner.orientationY.value = 0;
         panner.orientationZ.value = 0;
+        panner.positionX.value = positionX;
+        panner.positionY.value = positionY;
+        panner.positionZ.value = positionZ;
 
         var source = audioCtx.createMediaElementSource( player ); // this is where we hook up the <audio> element
         source.connect( panner );
         panner.connect( audioCtx.destination );
 
-
-        var listener = audioCtx.listener;
-        listener.positionX.value = 0;
-        listener.positionY.value = 0;
-        listener.positionZ.value = 3;
 
         this.playStream = function ( streamUrl ) {
             // get the input stream from the audio element
@@ -54,9 +60,10 @@
 
         // helpers
         createLeftSound: function ( ) {
+
             var player = document.getElementById( 'left-sound' );
             var loader = new window.SoundcloudLoader( player );
-            var audioSource = new SoundCloudAudioSource( player );
+            var audioSource = new SoundCloudAudioSource( player, -10, 0, 0 );
 
             var loadAndUpdate = function ( trackUrl ) {
                 loader.loadStream( trackUrl,
@@ -71,13 +78,39 @@
             loadAndUpdate( leftSound );
         },
 
+        createRightSound: function ( ) {
+
+            var player = document.getElementById( 'right-sound' );
+            var loader = new window.SoundcloudLoader( player );
+            var audioSource = new SoundCloudAudioSource( player, 10, 0, 0 );
+
+            var loadAndUpdate = function ( trackUrl ) {
+                loader.loadStream( trackUrl,
+                    function () {
+                        osg.log( 'streaming ' + trackUrl );
+                        audioSource.playStream( loader.streamUrl() );
+                    },
+                    function () {
+                        osg.error( loader.errorMessage );
+                    } );
+            };
+            loadAndUpdate( rightSound );
+        },
+
 
         createScene: function () {
             // the root node
             var scene = new osg.Node();
             scene.getOrCreateStateSet().setAttributeAndModes( new osg.CullFace( 0 ) );
 
+            var listener = getOrCreateAudioContext().listener;
+            window.listener = listener;
+            listener.positionX.value = 0;
+            listener.positionY.value = 0;
+            listener.positionZ.value = 0;
+
             this.createLeftSound();
+            this.createRightSound();
 
             this.getRootNode().addChild( scene );
 
